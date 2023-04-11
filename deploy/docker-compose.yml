@@ -1,0 +1,66 @@
+version: '3.9'
+
+services:
+  api: &main_app
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile
+    image: deployer:${DEPLOYER_VERSION:-latest}
+    restart: always
+    env_file:
+    - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DEPLOYER_HOST: 0.0.0.0
+      DEPLOYER_DB_HOST: deployer-db
+      DEPLOYER_DB_PORT: 5432
+      DEPLOYER_DB_USER: deployer
+      DEPLOYER_DB_PASS: deployer
+      DEPLOYER_DB_BASE: deployer
+
+  taskiq-worker:
+    <<: *main_app
+    labels: []
+    command:
+    - taskiq
+    - worker
+    - deployer.taskiq:broker
+
+  db:
+    image: postgres:13.8-bullseye
+    hostname: deployer-db
+    environment:
+      POSTGRES_PASSWORD: "deployer"
+      POSTGRES_USER: "deployer"
+      POSTGRES_DB: "deployer"
+    volumes:
+    - deployer-db-data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: pg_isready -U deployer
+      interval: 2s
+      timeout: 3s
+      retries: 40
+
+  migrator:
+    image: deployer:${DEPLOYER_VERSION:-latest}
+    restart: "no"
+    command: piccolo migrations forwards all
+    environment:
+      DEPLOYER_DB_HOST: deployer-db
+      DEPLOYER_DB_PORT: 5432
+      DEPLOYER_DB_USER: deployer
+      DEPLOYER_DB_PASS: deployer
+      DEPLOYER_DB_BASE: deployer
+      PICCOLO_CONF: "deployer.piccolo_conf"
+    depends_on:
+      db:
+        condition: service_healthy
+
+
+
+volumes:
+  deployer-db-data:
+    name: deployer-db-data
