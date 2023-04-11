@@ -21,6 +21,6 @@ async def send_echo_message(
 
 
 @router.post("/paddle/392c8fca-0019-47cc-98e3-f4a10f62ed62", status_code=http.HTTPStatus.ACCEPTED)
-async def webhook(data: Annotated[str, Form()]):
+async def webhook(data: Annotated[list, Form()]):
     print(data)
     return {}
